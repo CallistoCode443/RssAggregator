@@ -73,6 +73,16 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>io.swagger.core.v3</groupId>
+			<artifactId>swagger-annotations</artifactId>
+			<version>2.2.43</version>
+		</dependency>
 
 		<dependency>
 			<groupId>com.rometools</groupId>
@@ -84,6 +94,40 @@
 
 	<build>
 		<plugins>
+			<plugin>
+				<groupId>org.openapitools</groupId>
+				<artifactId>openapi-generator-maven-plugin</artifactId>
+				<version>7.20.0</version>
+				<configuration>
+					<inputSpec>${project.basedir}/src/main/resources/openapi.yaml</inputSpec>
+					<generatorName>spring</generatorName>
+					<apiPackage>com.example.rssaggregator</apiPackage>
+					<modelPackage>com.example.rssaggregator.model</modelPackage>
+					<configOptions>
+						<useSpringBoot3>true</useSpringBoot3>
+						<useTags>true</useTags>
+						<interfaceOnly>true</interfaceOnly>
+						<dateLibrary>java8</dateLibrary>
+						<openApiNullable>false</openApiNullable>
+						<useBeanValidation>true</useBeanValidation>
+						<useOptional>false</useOptional>
+						<skipDefaultInterface>true</skipDefaultInterface>
+					</configOptions>
+				</configuration>
+				<executions>
+					<execution>
+						<id>openapi</id>
+						<goals>
+							<goal>generate</goal>
+						</goals>
+						<configuration>
+							<skip>false</skip>
+							<additionalProperties>removeEnumValuePrefix=false</additionalProperties>
+							<inputSpec>${project.basedir}/src/main/resources/openapi.yaml</inputSpec>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
