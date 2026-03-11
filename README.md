@@ -26,6 +26,8 @@ git clone https://github.com/CallistoCode443/RssAggregator.git
 
 cd RssAggregator
 
+./mvnw generate-sources
+
 docker-compose up -d
 
 ./mvnw spring-boot:run
