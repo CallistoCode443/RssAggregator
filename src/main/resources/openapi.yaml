@@ -149,10 +149,6 @@ paths:
       responses:
         '204':
           description: Source deleted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   schemas:
@@ -203,6 +199,8 @@ components:
         sourceId:
           type: integer
           format: int64
+        sourceName:
+          type: string
         title:
           type: string
         description:

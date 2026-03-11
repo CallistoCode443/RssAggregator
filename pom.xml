@@ -90,6 +90,12 @@
 			<version>2.1.0</version>
 			<scope>compile</scope>
 		</dependency>
+
+		<dependency>
+			<groupId>org.mapstruct</groupId>
+			<artifactId>mapstruct</artifactId>
+			<version>1.6.3</version>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -101,12 +107,13 @@
 				<configuration>
 					<inputSpec>${project.basedir}/src/main/resources/openapi.yaml</inputSpec>
 					<generatorName>spring</generatorName>
-					<apiPackage>com.example.rssaggregator</apiPackage>
+					<apiPackage>com.example.rssaggregator.api</apiPackage>
 					<modelPackage>com.example.rssaggregator.model</modelPackage>
 					<configOptions>
 						<useSpringBoot3>true</useSpringBoot3>
 						<useTags>true</useTags>
 						<interfaceOnly>true</interfaceOnly>
+						<useSpringController>true</useSpringController>
 						<dateLibrary>java8</dateLibrary>
 						<openApiNullable>false</openApiNullable>
 						<useBeanValidation>true</useBeanValidation>
