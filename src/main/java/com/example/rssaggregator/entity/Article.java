@@ -10,7 +10,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -48,11 +47,4 @@ public class Article {
 
     @Column(name = "fetched_at", nullable = false)
     private Instant fetchedAt;
-
-    @PrePersistg
-    public void prePersist() {
-        if (fetchedAt == null) {
-            fetchedAt = Instant.now();
-        }
-    }
 }
