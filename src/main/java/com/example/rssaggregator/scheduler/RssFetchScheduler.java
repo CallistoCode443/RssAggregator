@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import com.example.rssaggregator.entity.Article;
 import com.example.rssaggregator.entity.Source;
+import com.example.rssaggregator.metrics.RssMetrics;
 import com.example.rssaggregator.parser.RssParser;
 import com.example.rssaggregator.service.ArticleService;
 import com.example.rssaggregator.service.SourceService;
@@ -21,21 +22,22 @@ public class RssFetchScheduler {
     private final SourceService sourceService;
     private final ArticleService articleService;
     private final RssParser rssParser;
+    private final RssMetrics rssMetrics;
 
-    @Scheduled(cron = "${scheduling.rss-fetch.cron}")
+    @Scheduled(cron = "${scheduling.rss-fetch-cron}")
     public void fetchAllSources() {
-        List<Source> activeSources = sourceService.getActivSources();
-        log.info("Starting RSS fetch for {} active sources", activeSources.size());
+        List<Source> sources = sourceService.getActiveSources();
 
-        for (Source source : activeSources) {
-            try {
-                List<Article> articles = rssParser.parse(source);
-                articleService.saveNewArticles(source, articles);
-            } catch (Exception e) {
-                log.error("Error fetching source '{}': {}", source.getName(), e.getMessage());
-            }
+        for (Source source : sources) {
+            rssMetrics.recordFetchDuration(() -> {
+                try {
+                    List<Article> articles = rssParser.parse(source);
+                    articleService.saveNewArticles(source, articles);
+                } catch (Exception e) {
+                    rssMetrics.incrementFetchErrors(); // считаем ошибку
+                    log.error("Error fetching source '{}'", source.getName(), e);
+                }
+            });
         }
-
-        log.info("RSS fetch completed");
     }
 }

@@ -54,7 +54,7 @@ public class SourceService {
         sourceRepository.deleteById(id);
     }
 
-    public List<Source> getActivSources() {
+    public List<Source> getActiveSources() {
         return sourceRepository.findAllByActiveTrue();
     }
 }

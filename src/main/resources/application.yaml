@@ -30,3 +30,12 @@ springdoc:
 logging:
   level:
     com.example.rssaggregator: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  metrics:
+    export:
+      enabled: true

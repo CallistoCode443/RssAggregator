@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.rssaggregator.entity.Article;
 import com.example.rssaggregator.entity.Source;
 import com.example.rssaggregator.mapper.ArticleMapper;
+import com.example.rssaggregator.metrics.RssMetrics;
 import com.example.rssaggregator.model.ArticleDto;
 import com.example.rssaggregator.model.ArticlePage;
 import com.example.rssaggregator.repository.ArticleRepository;
@@ -29,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 public class ArticleService {
     private final ArticleRepository articleRepository;
     private final ArticleMapper articleMapper;
+    private final RssMetrics rssMetrics;
 
     public ArticlePage getArticles(String category, Long sourceId, String q, OffsetDateTime from, OffsetDateTime to,
             Pageable pageable) {
@@ -73,5 +75,7 @@ public class ArticleService {
             articleRepository.saveAll(newArticles);
             log.info("Saved {} new articles for source '{}'", newArticles.size(), source.getName());
         }
+
+        rssMetrics.incrementArticlesSaved(newArticles.size());
     }
 }

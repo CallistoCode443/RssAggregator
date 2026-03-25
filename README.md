@@ -12,6 +12,8 @@
 - **OpenAPI 3.0.3** - спецификация API
 - **Docker Compose**
 - **ROME** - библиотека для парсинга RSS-лент
+- **Micrometer + Prometheus + Grafana** — метрики и мониторинг
+
 ---
 ## Как запустить
 
@@ -189,3 +191,81 @@ public class ArticlesController implements ArticlesApi {
    }
 }
 ```
+
+## Метрики и мониторинг
+
+В проекте настроен мониторинг через **Micrometer → Prometheus → Grafana**.
+
+Помимо стандартных метрик JVM и HTTP реализованы три кастомные метрики. Для этого создан класс `RssMetrics` — он регистрирует счётчики и таймер через `MeterRegistry` из Micrometer:
+
+```java
+@Component
+@RequiredArgsConstructor
+public class RssMetrics {
+
+    private final MeterRegistry registry;
+
+    private Counter articlesSavedCounter;
+    private Counter fetchErrorsCounter;
+    private Timer fetchDurationTimer;
+
+    @PostConstruct
+    public void init() {
+        articlesSavedCounter = Counter.builder("rss.articles.saved")
+                .description("Количество сохранённых статей")
+                .register(registry);
+
+        fetchErrorsCounter = Counter.builder("rss.fetch.errors")
+                .description("Количество ошибок при обходе источников")
+                .register(registry);
+
+        fetchDurationTimer = Timer.builder("rss.fetch.duration")
+                .description("Время обхода одного источника")
+                .register(registry);
+    }
+
+    public void incrementArticlesSaved(int count) { articlesSavedCounter.increment(count); }
+    public void incrementFetchErrors() { fetchErrorsCounter.increment(); }
+    public void recordFetchDuration(Runnable task) { fetchDurationTimer.record(task); }
+}
+```
+
+Метрики подключены в планировщик `RssFetchScheduler` — каждый обход источника оборачивается в таймер, а ошибки считаются счётчиком:
+
+```java
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class RssFetchScheduler {
+
+    private final SourceService sourceService;
+    private final ArticleService articleService;
+    private final RssParser rssParser;
+    private final RssMetrics rssMetrics;
+
+    @Scheduled(cron = "${scheduling.rss-fetch-cron}")
+    public void fetchAllSources() {
+        List<Source> sources = sourceService.getActiveSources();
+
+        for (Source source : sources) {
+            rssMetrics.recordFetchDuration(() -> {
+                try {
+                    List<Article> articles = rssParser.parse(source);
+                    articleService.saveNewArticles(source, articles);
+                } catch (Exception e) {
+                    rssMetrics.incrementFetchErrors();
+                    log.error("Error fetching source '{}'", source.getName(), e);
+                }
+            });
+        }
+    }
+}
+```
+
+### Кастомные метрики приложения
+
+| Метрика | Тип | Описание |
+|---------|-----|----------|
+| `rss_articles_saved_total` | Counter | Количество сохранённых статей |
+| `rss_fetch_errors_total` | Counter | Количество ошибок при обходе источников |
+| `rss_fetch_duration_seconds` | Timer | Время обхода одного источника |
