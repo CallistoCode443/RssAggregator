@@ -269,3 +269,7 @@ public class RssFetchScheduler {
 | `rss_articles_saved_total` | Counter | Количество сохранённых статей |
 | `rss_fetch_errors_total` | Counter | Количество ошибок при обходе источников |
 | `rss_fetch_duration_seconds` | Timer | Время обхода одного источника |
+
+### Постой дашборд с полезными запросами, позволяющими оценить состояние приложения
+
+![alt text](docs/dashboard.png)
