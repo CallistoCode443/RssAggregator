@@ -27,15 +27,17 @@ public class RssFetchScheduler {
     @Scheduled(cron = "${scheduling.rss-fetch-cron}")
     public void fetchAllSources() {
         List<Source> sources = sourceService.getActiveSources();
+        log.info("Starting RSS fetch for {} sources", sources.size());
 
         for (Source source : sources) {
             rssMetrics.recordFetchDuration(() -> {
                 try {
                     List<Article> articles = rssParser.parse(source);
                     articleService.saveNewArticles(source, articles);
+                    log.info("Fetched {} articles from '{}'", articles.size(), source.getName());
                 } catch (Exception e) {
-                    rssMetrics.incrementFetchErrors(); // считаем ошибку
-                    log.error("Error fetching source '{}'", source.getName(), e);
+                    rssMetrics.incrementFetchErrors();
+                    log.error("Failed to fetch source '{}': {}", source.getName(), e.getMessage(), e);
                 }
             });
         }

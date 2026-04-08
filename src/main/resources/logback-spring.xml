@@ -1,0 +1,32 @@
+<configuration>
+
+  <!-- Консольный вывод -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss} %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Loki appender — отправляет логи по HTTP -->
+  <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+    <http>
+      <url>http://localhost:3100/loki/api/v1/push</url>
+    </http>
+    <format>
+      <label>
+        <!-- Метки, по которым Loki индексирует потоки логов -->
+        <pattern>app=rss-aggregator,level=%level,host=${HOSTNAME}</pattern>
+      </label>
+      <message>
+        <!-- Формат каждой строки лога -->
+        <pattern>%d{ISO8601} [%thread] %-5level %logger{36} - %msg%n</pattern>
+      </message>
+    </format>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE" />
+    <appender-ref ref="LOKI" />
+  </root>
+
+</configuration>
