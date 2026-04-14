@@ -2,6 +2,7 @@ package com.example.rssaggregator.scheduler;
 
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -12,6 +13,8 @@ import com.example.rssaggregator.parser.RssParser;
 import com.example.rssaggregator.service.ArticleService;
 import com.example.rssaggregator.service.SourceService;
 
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,6 +26,7 @@ public class RssFetchScheduler {
     private final ArticleService articleService;
     private final RssParser rssParser;
     private final RssMetrics rssMetrics;
+    private final Tracer tracer;
 
     @Scheduled(cron = "${scheduling.rss-fetch-cron}")
     public void fetchAllSources() {
@@ -30,16 +34,29 @@ public class RssFetchScheduler {
         log.info("Starting RSS fetch for {} sources", sources.size());
 
         for (Source source : sources) {
-            rssMetrics.recordFetchDuration(() -> {
-                try {
-                    List<Article> articles = rssParser.parse(source);
-                    articleService.saveNewArticles(source, articles);
-                    log.info("Fetched {} articles from '{}'", articles.size(), source.getName());
-                } catch (Exception e) {
-                    rssMetrics.incrementFetchErrors();
-                    log.error("Failed to fetch source '{}': {}", source.getName(), e.getMessage(), e);
-                }
-            });
+
+            Span span = tracer.nextSpan()
+                    .name("rss.fetch")
+                    .tag("source.name", source.getName())
+                    .tag("source.url", source.getUrl())
+                    .start();
+
+            try (Tracer.SpanInScope ws = tracer.withSpan(span)) {
+                rssMetrics.recordFetchDuration(() -> {
+                    try {
+                        List<Article> articles = rssParser.parse(source);
+                        articleService.saveNewArticles(source, articles);
+                        span.tag("articles.count", String.valueOf(articles.size()));
+                        log.info("Fetched {} articles from '{}'", articles.size(), source.getName());
+                    } catch (Exception e) {
+                        span.tag("error", e.getMessage());
+                        rssMetrics.incrementFetchErrors();
+                        log.error("Failed to fetch source '{}': {}", source.getName(), e.getMessage(), e);
+                    }
+                });
+            } finally {
+                span.end();
+            }
         }
     }
 }

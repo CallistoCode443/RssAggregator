@@ -442,3 +442,156 @@ rate({app="rss-aggregator", level="ERROR"}[10m])
 ```
 
 ![alt text](docs/image-5.png)
+
+## Трассировка
+
+В проекте настроена трассировка через **Micrometer Tracing → Grafana Tempo**. Каждый входящий HTTP-запрос и каждый обход RSS-источника получают уникальный `traceId`, по которому можно найти полный путь выполнения операции.
+
+### Подключение зависимостей
+
+В `pom.xml` добавляются следующие зависимостри:
+
+```xml
+<!-- Micrometer Tracing -->
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-tracing-bridge-brave</artifactId>
+</dependency>
+
+<!-- Zipkin reporter — отправка трейсов в Tempo -->
+<dependency>
+    <groupId>io.zipkin.reporter2</groupId>
+    <artifactId>zipkin-reporter-brave</artifactId>
+</dependency>
+```
+
+### Конфигурация в application.yml
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+
+spring:
+  zipkin:
+    base-url: http://localhost:9411
+    enabled: true
+```
+
+### Ручная инструментация планировщика
+
+HTTP-запросы трассируются автоматически, но фоновые задачи (`@Scheduled`) нужно инструментировать вручную. Для этого в `RssFetchScheduler` инжектируется `Tracer`:
+
+```java
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class RssFetchScheduler {
+    private final SourceService sourceService;
+    private final ArticleService articleService;
+    private final RssParser rssParser;
+    private final RssMetrics rssMetrics;
+    private final Tracer tracer;
+
+    @Scheduled(cron = "${scheduling.rss-fetch-cron}")
+    public void fetchAllSources() {
+        List<Source> sources = sourceService.getActiveSources();
+        log.info("Starting RSS fetch for {} sources", sources.size());
+
+        for (Source source : sources) {
+
+            Span span = tracer.nextSpan()
+                    .name("rss.fetch")
+                    .tag("source.name", source.getName())
+                    .tag("source.url", source.getUrl())
+                    .start();
+
+            try (Tracer.SpanInScope ws = tracer.withSpan(span)) {
+                rssMetrics.recordFetchDuration(() -> {
+                    try {
+                        List<Article> articles = rssParser.parse(source);
+                        articleService.saveNewArticles(source, articles);
+                        span.tag("articles.count", String.valueOf(articles.size()));
+                        log.info("Fetched {} articles from '{}'", articles.size(), source.getName());
+                    } catch (Exception e) {
+                        span.tag("error", e.getMessage());
+                        rssMetrics.incrementFetchErrors();
+                        log.error("Failed to fetch source '{}': {}", source.getName(), e.getMessage(), e);
+                    }
+                });
+            } finally {
+                span.end();
+            }
+        }
+    }
+}
+```
+
+### Настройка Tempo в docker-compose.yml
+
+```yaml
+services:
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    command: -config.file=/etc/tempo/tempo.yaml
+    ports:
+      - "3200:3200"
+      - "9411:9411"
+      - "9095:9095"
+    volumes:
+      - ./tempo.yaml:/etc/tempo/tempo.yaml
+      - tempo_data:/var/tempo
+
+volumes:
+  tempo_data:
+```
+
+### Конфиг `tempo.yaml`:
+
+```yaml
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    zipkin:
+      endpoint: 0.0.0.0:9411
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/blocks
+```
+
+### Просмотр трейсов в Grafana
+
+```traceql
+# Все трейсы приложения
+{ resource.service.name = "rssaggregator" }
+```
+
+![alt text](docs/trace1.png)
+
+```traceql
+# Трейсы дольше 2 секунд
+{ resource.service.name = "rssaggregator" && duration > 2s }
+
+```
+
+![alt text](docs/trace2.png)
+
+```traceql
+# Трейсы с ошибками
+{ resource.service.name = "rssaggregator" && status = error }
+```
+
+![alt text](docs/trace3.png)
+
+```traceql
+{ span.source.name = "ria" }
+```
+
+![alt text](docs/trace4.png)
