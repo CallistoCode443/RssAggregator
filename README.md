@@ -601,3 +601,71 @@ storage:
 ![span > 1](docs/trace5.png)
 
 ![alt text](docs/trace6.png)
+
+## CI/CD
+
+В проекте настроен CI через **GitHub Actions**.
+
+### Файл workflow
+
+Файл располагается по пути `.github/workflows/deploy.yaml`:
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: rssaggregator
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Grant execute permission for mvnw
+        run: chmod +x mvnw
+
+      - name: Build with Maven
+        run: ./mvnw clean package -DskipTests
+
+      - name: Run tests
+        run: ./mvnw test
+```
+
+### Как работает pipeline
+
+При пуше в `main` GitHub поднимает Ubuntu-среду и рядом запускает контейнер PostgreSQL 17 — он доступен по `localhost:5433`. Runner ждёт пока база станет healthy, затем последовательно собирает проект и прогоняет тесты. Результат можно увидеть прямо в репозитории, во вкладке Actions или напротив каждого коммита.
