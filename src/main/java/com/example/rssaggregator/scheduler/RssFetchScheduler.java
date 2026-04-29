@@ -2,7 +2,6 @@ package com.example.rssaggregator.scheduler;
 
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -46,6 +45,7 @@ public class RssFetchScheduler {
                     try {
                         List<Article> articles = rssParser.parse(source);
                         articleService.saveNewArticles(source, articles);
+
                         span.tag("articles.count", String.valueOf(articles.size()));
                         log.info("Fetched {} articles from '{}'", articles.size(), source.getName());
                     } catch (Exception e) {
